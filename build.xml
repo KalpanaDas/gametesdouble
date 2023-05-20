@@ -1,0 +1,111 @@
+<project name="gametes" default="cleanAndJar" basedir=".">
+
+	<description>Genetic Architecture Model Emulator for Testing and Evaluation of Software</description>
+
+	<property name="src" location="src" />
+	<property name="build" location="build" />
+	<property name="dist" location="dist" />
+  <property name="res" location="resources" />
+  <property name="scripts" location="scripts" />
+	<property name="lib" location="lib" />
+	<property name="data" location="data" />
+	<property name="doc" location="doc" />
+	<property name="debug" value="true" />
+	<property name="tempZip" value="${dist}/temp.zip" />
+	<property name="dist.jar" value="${dist}/${ant.project.name}.jar" />
+	<property name="distributionZip" value="${dist}/${ant.project.name}.zip" />
+
+	<!-- Set up project.class.path -->
+	<fileset id="external.jars" dir="${lib}" includes="**/*.jar,**/*.zip" />
+	<path id="class.path">
+		<fileset refid="external.jars" />
+	</path>
+
+	<target name="compile" description="compile the source">
+		<mkdir dir="${build}" />
+		<javac srcdir="${src}" destdir="${build}" source="1.6" includeantruntime="false" target="1.6" debug="${debug}" debuglevel="lines,vars,source">
+			<classpath refid="class.path" />
+		</javac>
+	</target>
+
+	<target name="jar" depends="compile" description="build an executable jar file">
+		<mkdir dir="${dist}" />
+		<propertyfile file="${scripts}/deployment.properties" comment="Build version info">
+			<entry key="buildDate" type="date" value="now" />
+			<entry key="buildNum" default="0" type="int" operation="+" value="1" />
+		</propertyfile>
+		<copy todir="${build}" preservelastmodified="true" overwrite="true">
+			<fileset dir="${scripts}" excludes="**/.svn,**/CVS,**/deployment.properties" />
+		</copy>
+		<replace file="${build}/${ant.project.name}.properties" value="value not found in deployment.properties" propertyFile="${scripts}/deployment.properties">
+			<replacefilter token="@buildDate@" property="buildDate" />
+			<replacefilter token="@buildNum@" property="buildNum" />
+			<replacefilter token="@version@" property="version" />
+			<replacefilter token="@releaseType@" property="releaseType" />
+		</replace>
+		<replace file="${build}/RELEASE_NOTES.txt" value="value not found in deployment.properties" propertyFile="${scripts}/deployment.properties">
+			<replacefilter token="@buildDate@" property="buildDate" />
+			<replacefilter token="@buildNum@" property="buildNum" />
+			<replacefilter token="@version@" property="version" />
+			<replacefilter token="@releaseType@" property="releaseType" />
+		</replace>
+		<copy file="${build}/RELEASE_NOTES.txt" todir="${dist}" overwrite="true" />
+    <copy file="${data}/tables_2_05.txt" todir="${dist}" overwrite="true" />
+ 		<delete file="${tempZip}" quiet="true" />
+		<zip destfile="${tempZip}" duplicate="preserve">
+			<fileset dir="${build}" />
+			<fileset dir="${res}" />
+			<zipgroupfileset refid="external.jars" />
+		</zip>
+		<delete file="${dist.jar}" quiet="true" />
+		<jar destfile="${dist.jar}">
+			<manifest>
+				<attribute name="Main-Class" value="org.epistasis.snpgen.ui.SnpGenMainWindow" />
+			</manifest>
+			<zipgroupfileset file="${tempZip}" />
+		</jar>
+		<delete file="${tempZip}" quiet="true" />
+		<property name="keystore.location" value="${build}/uiKeyStore" />
+		<delete file="${keystore.location}" quiet="true" />
+		<property name="key.alias" value="gametes.epistasis.org" />
+		<property name="keystore.password" value="gametesGenPass" />
+		<genkey alias="${key.alias}" keystore="${keystore.location}" storepass="${keystore.password}" validity="3650">
+			<dname>
+				<param name="CN" value="gametes" />
+				<param name="OU" value="Dartmouth Computational Genetics Laboratory" />
+				<param name="O" value="www.epistasis.org" />
+				<param name="C" value="US" />
+			</dname>
+		</genkey>
+		<signjar jar="${dist.jar}" alias="${key.alias}" keystore="${keystore.location}" storepass="${keystore.password}" />
+		<delete file="${distributionZip}" quiet="true" />
+		<zip update="true" basedir="${dist}" destfile="${distributionZip}" filesonly="true">
+			<fileset dir="${basedir}">
+				<include name="COPYING" />
+			</fileset>
+			<exclude name="**/*.zip" />
+		</zip>
+	</target>
+
+	<target name="doc" description="build javadoc files">
+		<mkdir dir="${doc}" />
+		<javadoc destdir="${doc}" sourcepath="${src}" source="1.6" packagenames="org.epistasis.*" private="true">
+			<classpath refid="class.path" />
+		</javadoc>
+	</target>
+
+	<target name="cleanAndJar">
+		<antcall target="clean" />
+		<antcall target="jar" />
+	</target>
+
+	<target name="all" depends="jar,doc" description="build all files" />
+
+	<target name="clean" description="clean up">
+		<delete dir="${dist}" />
+		<delete dir="${build}" />
+		<delete dir="${doc}" />
+		<delete file="${ant.project.name}.jpx.local~" />
+	</target>
+
+</project>
